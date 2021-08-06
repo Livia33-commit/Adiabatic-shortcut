@@ -1,0 +1,150 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+class TicTacToe():
+
+	def __init__(self):
+		self.state = '---------'
+		self.winner = 'Unfinished'
+
+	def get_winner(self):
+		wins = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+		for line in wins:
+			s = self.state[line[0]] + self.state[line[1]] + self.state[line[2]]
+			if s == 'XXX':
+				self.winner = 'X'
+				break
+			elif s == 'OOO':
+				self.winner = 'O'
+				break
+			else:
+				self.winner = 'Tie'
+		if self.winner == 'Tie':
+			for i in range(9):
+				if self.state[i] == '-':
+					self.winner = 'Unfinished'
+					break
+
+            
+
+class QAgent():
+	def __init__(self):
+		self.side = 'O'
+		self.gamma = 0.6 #discount rate
+		self.alpha = 0.1 #learning rate
+		self.values = dict()
+	    
+	def action(self, state):
+		if state not in self.values.keys():
+			self.values[state] = [0.5]*9
+		while True:
+			m=[]
+			m.append(np.argmax(np.array(self.values[state])))
+			for i in m:
+				ma= np.random.choice(i)
+				if state[ma] == '-':
+					return ma
+				break
+			else:
+				self.values[state][ma] = -1
+
+	def updateQ(self, state, action, next_max):
+		self.values[state][action] = (1-self.alpha)*self.values[state][action] + self.alpha*self.gamma*next_max
+    
+	def reward(self, winner):
+		if winner == self.side:
+			return 1
+		elif winner == 'Tie':
+			return 0.5
+		else:
+			return 0
+			
+	def learning(self,player):
+	
+		history = []
+		while board.winner == 'Unfinished':
+			move = self.player1.action(state = board.state)
+			history.append([board.state, move])
+		cache = history[-1]
+		player.values[cache[0]][cache[1]] = player.reward(winner = board.winner)
+		for i in range(1, len(history)):
+			next_max = max(player.values[cache[0]])
+			cache = history[-i-1]
+			player1.updateQ(state = cache[0], action = cache[1], next_max = next_max)
+		return board.winner
+		
+	def play(self):
+		Environment=Environment()
+		play= Environment
+		return play
+		
+class RandomAgent():
+
+	def __init__(self):
+		self.side = 'X'
+
+	def action(self, state):
+		possible = []
+		for i in range(9):
+			if state[i] == '-':
+				possible.append(i)
+		return random.choice(possible)
+
+
+class Environment(): 
+
+	def __init__(self,player2=RandomAgent(),board=TicTacToe(), num_games=100,epoch = 50000,num_wins = 0,num_losses = 0,num_ties = 0):	
+		self.player2= player2
+		self.board= board
+		self.num_games = num_games
+		self.epoch = epoch
+		self.num_wins = num_wins
+		self.num_losses = num_losses
+		self.num_ties = num_ties
+
+
+	def steps(self,player2,board):
+		while board.winner == 'Unfinished':
+			board.state = board.state[:move] + player1.side + board.state[move+1:]
+			board.get_winner()
+			if board.winner != 'Unfinished':
+				break
+			move = player2.action(state = board.state)
+			board.state = board.state[:move] + player2.side + board.state[move+1:]
+			board.get_winner()
+
+       
+num_games = 100
+epoch = 50000
+num_wins = 0
+num_losses = 0
+num_ties = 0
+pwin = []
+plose = []
+ptie = []
+player2 = RandomAgent()
+player2.side = 'X'
+for i in range(epoch):
+		winner = Environment
+		if winner == 'O':
+			num_wins += 1
+		elif winner == 'Tie':
+			num_ties += 1
+		else:
+			num_losses += 1
+		if (i+1)%num_games == 0:
+			pwin.append(float(num_wins)/num_games)
+			plose.append(float(num_losses)/num_games)
+			ptie.append(float(num_ties)/num_games)
+			num_wins = 0
+			num_losses = 0
+			num_ties = 0
+
+count = range(num_games, epoch+num_games, num_games)
+plt.plot(count, pwin, color="red")
+#plt.plot(count, plose)
+#plt.plot(count, ptie)
+plt.show()
+
+
