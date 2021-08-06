@@ -1,0 +1,192 @@
+import numpy as np
+from scipy import linalg
+import matplotlib.pyplot as plt
+from numpy.random import default_rng
+from tabulate import tabulate
+from matplotlib import animation
+import math
+
+
+
+
+psi_0 = np.array([1, 0], dtype = complex)
+sigmaX = np.array([[0, 1],[ 1, 0]], dtype = complex)
+sigmaY = np.array([[0, -1j],[1j, 0]], dtype = complex)
+sigmaZ = np.array([[1, 0],[0, -1]], dtype = complex)
+
+class Qubit():
+    dTheta = np.pi / 10
+    dPhi = 2 * np.pi / 10
+
+    def __init__(self):
+        self.state = psi_0
+
+    def reset(self):
+        self.state = psi_0
+
+    def compact(self):
+        p = np.power(np.absolute(self.state), 2)
+        theta = np.arccos((p[0] - p[1]) / (p[0] + p[1]))
+        phi = np.angle(self.state[1]) - np.angle(self.state[0])
+        if phi < 0:
+            phi += 2 * np.pi
+        thetaIndex = round(theta / Qubit.dTheta)
+        phiIndex = round(phi / Qubit.dPhi)
+        return thetaIndex, phiIndex
+    
+    def inspect(self):
+        p = np.power(np.absolute(self.state), 2)
+        theta = np.arccos((p[0] - p[1]) / (p[0] + p[1]))
+        phi = np.angle(self.state[1]) - np.angle(self.state[0])
+        if phi < 0:
+            phi += 2 * np.pi
+        return theta, phi 
+        
+    def timeEvolve(self, u):
+        hamiltonian = 0.2 * sigmaZ + u * sigmaX
+        dt = np.pi / 10
+        a = linalg.expm(-1j * hamiltonian * dt)
+        self.state = a.dot(self.state)
+        
+    def fidelity(self):
+        f = abs(self.state[1]) ** 2
+        return f
+
+class Environment(): 
+    threshold = 0.98
+    maxSteps = 100
+    nActions = 10
+    uvalues = np.linspace(-0.5, 0.5, num = nActions)
+
+    def __init__(self):
+        self.qubit = Qubit()
+        self.nSteps = 0
+
+    def reset(self):
+        self.qubit.reset()
+        self.nSteps = 0
+
+    def reward(self):	
+        f = self.qubit.fidelity()
+        if f == 1:
+            reward = 1000
+        else:
+            reward = f / (1-f)
+        return reward
+
+    def applyAction(self, action):
+        u = Environment.uvalues[action]
+        self.qubit.timeEvolve(u)
+        self.nSteps += 1
+
+    def timeEvolve(self,u):  
+        self.qubit.timeEvolve(u) 
+        return self.qubit.timeEvolve(u) 
+        
+    def inprogress(self):
+        if self.qubit.fidelity() > Environment.threshold:
+            return False
+        if self.nSteps >= Environment.maxSteps:
+            return False
+        return True
+
+    def state(self):
+        return self.qubit.inspect()
+
+class Agent():
+    gamma = 0.999
+    alpha = 0.001
+    epsilon = 0.1
+
+    def __init__(self, size):
+        self.values = dict()
+        self.nActions = size
+
+    def updateQ(self, state, action, next_max):
+        self.values[state][action] *= 1-self.alpha
+        self.values[state][action] += self.alpha * self.gamma * next_max
+
+    def optimumPolicy(self, value):
+        m=[]
+        maxQ = max(value)
+        for i in range(len(value)):
+          if value[i] == maxQ:
+            m.append(i)
+        action = rng.choice(m)
+        return action
+
+    def randomPolicy(self, value):
+        return rng.integers(len(value))
+
+    def proposeAction(self, state):
+        if state not in self.values.keys():
+            self.values[state] = [0.5]*self.nActions
+        if rng.random() > Agent.epsilon:
+            return self.optimumPolicy(self.values[state])
+        else:
+            return self.randomPolicy(self.values[state])
+		
+    def learning(self, history, reward):
+        cache = history[-1]
+        self.values[cache[0]][cache[1]] = reward
+        for i in range(1, len(history)):
+            next_max = max(self.values[cache[0]])
+            cache = history[-i-1]
+            self.updateQ(cache[0], cache[1], next_max)  
+
+
+
+
+epoch = 10000
+n=100
+rng = default_rng()
+environment = Environment()
+qubit= Qubit()
+agent = Agent(Environment.nActions)
+result = []
+allSolutions = []
+for i in range(epoch):
+  history = []
+  environment.reset()
+  solution = []
+  while environment.inprogress():
+    state = environment.state()
+    action = agent.proposeAction(state)
+    uValue = environment.uvalues[action]
+    solution.insert(i, uValue)
+    history.append([state, action])
+    if i % n == 0:
+       print(agent.proposeAction(state))
+    environment.applyAction(action)
+    allSolutions.append( solution)
+  result.append(environment.reward())              
+  agent.learning(history, environment.reward())
+  Agent.epsilon = max(Agent.epsilon - 0.0001, 0.001)
+  maxResult = max(result)
+  index = result.index(maxResult)
+  bestSolution = allSolutions[index]
+print(bestSolution )
+#plt.plot(np.mean(np.reshape(np.array(result), (10, -1)), axis=0))  
+#plt.show()
+#plt.savefig("average_reward.png")
+   
+results = open("resultsq.txt", "w")
+for i in range(len(result)):
+   results.write(str(i) + " " + str(result[i]) + "\n")
+results.close()  
+
+
+environment.reset()
+f = open("qubit.txt", "w")
+state = environment.state()
+f.write(str(np.cos(state[1])* np.sin(state[0]))+ " " +str(np.sin(state[1]) * np.sin(state[0]))+ " " +str(np.cos(state[0])) + "\n")
+for i in range(len(bestSolution)):
+   environment.timeEvolve(bestSolution[i]) 
+   state = environment.state()
+   f.write(str(np.cos(state[1])* np.sin(state[0]))+ " " +str(np.sin(state[1]) * np.sin(state[0]))+ " " +str(np.cos(state[0])) +"\n")
+f.close()
+
+beta = open("betaq.txt", "w")
+for i in range(len(bestSolution)):
+    beta.write(str(i) + " " + str(bestSolution[i]) + "\n")
+beta.close()
